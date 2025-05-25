@@ -10,7 +10,8 @@ namespace SamSoft.Mediator.CQRS.Tests
             var services = new ServiceCollection();
             services.AddMediatorCQRS(
                 pipelineBehaviors: [typeof(DummyValidationBehavior<,>), typeof(DummyLoggingBehavior<,>)],
-                assemblies: [typeof(MediatorTests).Assembly]
+                assemblies: [typeof(MediatorTests).Assembly],
+                addDefaultLogging: false
             );
             return services.BuildServiceProvider();
         }

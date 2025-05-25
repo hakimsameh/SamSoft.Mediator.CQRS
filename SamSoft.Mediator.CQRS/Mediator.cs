@@ -1,6 +1,8 @@
 namespace SamSoft.Mediator.CQRS;
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using SamSoft.Mediator.CQRS.Abstractions;
+using System.Reflection;
 
 /// <summary>
 /// Default implementation of the <see cref="IMediator"/> interface for CQRS and Mediator patterns.
@@ -94,17 +96,35 @@ public class Mediator(IServiceProvider serviceProvider) : IMediator
         where TNotification : INotification
     {
         var handlerType = typeof(INotificationHandler<>).MakeGenericType(typeof(TNotification));
-        var handlers = serviceProvider.GetServices(handlerType);
+        var handlers = serviceProvider.GetServices(handlerType).ToList();
 
-        var tasks = new List<Task>();
-        foreach (var handler in handlers)
+        // Default strategy
+        var strategy = NotificationPublishStrategy.Parallel;
+        var attr = typeof(TNotification).GetCustomAttribute<NotificationPublishStrategyAttribute>();
+        if (attr != null)
+            strategy = attr.Strategy;
+
+        if (strategy == NotificationPublishStrategy.Sequential)
         {
-            var method = handlerType.GetMethod("Handle");
-            if (method == null)
-                throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
-            var task = (Task)method.Invoke(handler, new object[] { notification!, cancellationToken })!;
-            tasks.Add(task);
+            foreach (var handler in handlers)
+            {
+                var method = handlerType.GetMethod("Handle");
+                if (method == null)
+                    throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
+                await (Task)method.Invoke(handler, new object[] { notification!, cancellationToken })!;
+            }
         }
-        await Task.WhenAll(tasks);
+        else // Parallel (default)
+        {
+            var tasks = new List<Task>();
+            foreach (var handler in handlers)
+            {
+                var method = handlerType.GetMethod("Handle");
+                if (method == null)
+                    throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
+                tasks.Add((Task)method.Invoke(handler, new object[] { notification!, cancellationToken })!);
+            }
+            await Task.WhenAll(tasks);
+        }
     }
 }

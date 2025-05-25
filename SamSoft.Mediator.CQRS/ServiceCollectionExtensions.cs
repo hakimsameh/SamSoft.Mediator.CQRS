@@ -5,24 +5,43 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMediatorCQRS(
         this IServiceCollection services,
         IEnumerable<Type>? pipelineBehaviors = null,
-        Assembly[]? assemblies = null)
+        Assembly[]? assemblies = null,
+        bool addDefaultLogging = true)
     {
         assemblies ??= new[] { Assembly.GetCallingAssembly() };
 
         // Register handlers
         RegisterHandlers(services, assemblies);
 
-        // Register pipeline behaviors in order
+        // Register TimeoutSettings for IOptions
+        services.Configure<DefaultBehaviors.TimeoutSettings>(options => { });
+
+        // Always add logging behavior first (outermost), unless disabled
+        if (addDefaultLogging)
+            services.AddOpenBehavior(typeof(DefaultBehaviors.AdvancedLoggingBehavior<,>));
+
+        // Always add timeout behavior (after logging, before user behaviors)
+        services.AddOpenBehavior(typeof(DefaultBehaviors.TimeoutBehavior<,>));
+
+        // Always add pre/post processor behavior (after timeout, before user behaviors)
+        services.AddOpenBehavior(typeof(DefaultBehaviors.PrePostProcessorBehavior<,>));
+
+        // Register user-supplied pipeline behaviors (if any)
         if (pipelineBehaviors != null)
         {
             foreach (var behaviorType in pipelineBehaviors)
-                services.AddOpenBehavior(behaviorType);
+            {
+                if (behaviorType != typeof(DefaultBehaviors.AdvancedLoggingBehavior<,>) &&
+                    behaviorType != typeof(DefaultBehaviors.TimeoutBehavior<,>) &&
+                    behaviorType != typeof(DefaultBehaviors.PrePostProcessorBehavior<,>))
+                    services.AddOpenBehavior(behaviorType);
+            }
         }
 
         // Register validators
         services.AddValidatorsFromAssemblies(assemblies, includeInternalTypes: true);
 
-        // Register mediator
+        // Register mediator and interfaces
         services.AddTransient<IMediator, Mediator>();
         services.AddTransient<ISender>(sp => sp.GetRequiredService<IMediator>());
         services.AddTransient<IPublisher>(sp => sp.GetRequiredService<IMediator>());

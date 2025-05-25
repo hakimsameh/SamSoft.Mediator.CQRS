@@ -11,7 +11,7 @@ public class QueryHandlerTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddMediatorCQRS();
+        services.AddMediatorCQRS(addDefaultLogging: false);
         services.AddTransient<IQueryHandler<MyQuery, string>, MyQueryHandler>();
         var provider = services.BuildServiceProvider();
         var mediator = provider.GetRequiredService<IMediator>();
@@ -31,7 +31,7 @@ public class QueryHandlerTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddMediatorCQRS();
+        services.AddMediatorCQRS(addDefaultLogging: false);
         services.AddTransient<IQueryHandler<MyQuery, string>, MyQueryHandler>();
         var provider = services.BuildServiceProvider();
         var mediator = provider.GetRequiredService<IMediator>();

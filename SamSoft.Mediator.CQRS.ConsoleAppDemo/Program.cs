@@ -58,6 +58,7 @@ public static class MyRequestHandlerExtensions
     {
         var pipelineBehaviors = new[]
         {
+            typeof(AdvancedLoggingBehavior<,>),
             typeof(ValidationBehavior<,>),
             typeof(LoggingPipelineBehavior<,>)
             
