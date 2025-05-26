@@ -1,7 +1,10 @@
 # SamSoft.Mediator.CQRS
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-repo)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/your-repo)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/hakimsameh/SamSoft.Mediator.CQRS)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/hakimsameh/SamSoft.Mediator.CQRS)
+[![NuGet](https://img.shields.io/nuget/v/SamSoft.Mediator.CQRS.svg?cacheSeconds=600)](https://www.nuget.org/packages/SamSoft.Mediator.CQRS)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 
 A modern, extensible, and high-performance .NET library for implementing the CQRS (Command Query Responsibility Segregation) and Mediator patterns. Supports commands, queries, notifications (publish/subscribe), pipeline behaviors, validation, and more.
 
@@ -10,7 +13,7 @@ A modern, extensible, and high-performance .NET library for implementing the CQR
 ## ✨ Features
 
 - **CQRS and Mediator patterns** for clean separation of concerns
-- **Command, Query, and Notification handlers**
+- **Command, Query, and Notification handlers** Supports `ICommand`, `ICommand<TResponse>`, `IQuery<TResponse>`, and `INotification` with their corresponding `ICommandHandler` and `IQueryHandler` interfaces, enabling diverse application logic.
 - **Pipeline behaviors** (logging, validation, etc.)
 - **FluentValidation integration**
 - **Publish/Subscribe notifications** (multiple handlers per event)
