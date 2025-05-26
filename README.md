@@ -166,7 +166,7 @@ Contributions are welcome! Please open issues or submit pull requests.
 
 ## 📬 Contact
 
-For questions or support, contact [your-email@example.com](mailto:your-email@example.com)
+For questions or support, contact [hakimsameh70@gmail.com](mailto:hakimsameh70@gmail.com)
 
 ---
 

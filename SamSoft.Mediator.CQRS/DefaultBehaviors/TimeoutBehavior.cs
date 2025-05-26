@@ -1,5 +1,4 @@
-﻿using SamSoft.Mediator.CQRS.Abstractions;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 
 namespace SamSoft.Mediator.CQRS.DefaultBehaviors;
 
@@ -7,14 +6,9 @@ namespace SamSoft.Mediator.CQRS.DefaultBehaviors;
 /// Pipeline behavior that cancels requests if they exceed a specified timeout.
 /// Uses Task.WhenAny for robust timeout enforcement.
 /// </summary>
-public class TimeoutBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+public class TimeoutBehavior<TRequest, TResponse>(IOptions<TimeoutSettings> options) : IPipelineBehavior<TRequest, TResponse>
 {
-    private readonly TimeSpan _timeout;
-
-    public TimeoutBehavior(IOptions<TimeoutSettings> options)
-    {
-        _timeout = options.Value.Timeout;
-    }
+    private readonly TimeSpan _timeout = options.Value.Timeout;
 
     public async Task<TResponse> Handle(TRequest request, HandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {

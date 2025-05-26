@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using SamSoft.Common.Results;
-using SamSoft.Mediator.CQRS;
 using SamSoft.Mediator.CQRS.Abstractions;
 using SamSoft.Mediator.CQRS.Tests.TestObjects;
 
