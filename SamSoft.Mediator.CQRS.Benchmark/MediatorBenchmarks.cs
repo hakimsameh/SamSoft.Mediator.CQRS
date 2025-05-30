@@ -20,9 +20,9 @@ public class MediatorBenchmarks
     {
         // SamSoft.Mediator.CQRS setup
         var services1 = new ServiceCollection();
-        services1.AddMediatorService();
+        services1.AddMediatorCQRS();
         services1.AddTransient<ICommandHandler<SampleCommand, string>, SampleCommandHandler>();       
-        _samSoftMediator = services1.BuildServiceProvider().GetRequiredService<SamSoft.Mediator.CQRS.Abstractions.IMediator>();
+        _samSoftMediator = services1.BuildServiceProvider().GetRequiredService<Abstractions.IMediator>();
 
         // MediatR setup
         var services2 = new ServiceCollection();
@@ -50,7 +50,7 @@ public class SampleCommandHandler : ICommandHandler<SampleCommand, string>
 
 // MediatR command/handler
 public record SampleMediatRCommand(string Value) : IRequest<string>;
-public class SampleMediatRHandler : IRequestHandler<SampleMediatRCommand, string>
+public class SampleMediatRHandler : MediatR.IRequestHandler<SampleMediatRCommand, string>
 {
     public Task<string> Handle(SampleMediatRCommand request, CancellationToken cancellationToken)
         => Task.FromResult(request.Value + "_handled");

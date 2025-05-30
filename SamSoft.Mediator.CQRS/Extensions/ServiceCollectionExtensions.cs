@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SamSoft.Mediator.CQRS.Abstractions.Requests;
 using SamSoft.Mediator.CQRS.Pipelines;
 
 namespace SamSoft.Mediator.CQRS.Extensions;
@@ -6,8 +7,7 @@ namespace SamSoft.Mediator.CQRS.Extensions;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMediatorCQRS(
-        this IServiceCollection services,
-        IEnumerable<Type>? pipelineBehaviors = null,
+        this IServiceCollection services,        
         Assembly[]? assemblies = null,
         bool addDefaultLogging = true)
     {
@@ -20,34 +20,34 @@ public static class ServiceCollectionExtensions
         services.Configure<TimeoutSettings>(options => { });
 
         // Always add logging behavior first (outermost), unless disabled
-        if (addDefaultLogging)
-            services.AddOpenBehavior(typeof(AdvancedLoggingBehavior<,>));
+        //if (addDefaultLogging)
+        //    services.AddOpenBehavior(typeof(AdvancedLoggingBehavior<,>));
 
         // Always add timeout behavior (after logging, before user behaviors)
-        services.AddOpenBehavior(typeof(TimeoutBehavior<,>));
+        //services.AddOpenBehavior(typeof(TimeoutBehavior<,>));
 
         // Always add pre/post processor behavior (after timeout, before user behaviors)
-        services.AddOpenBehavior(typeof(PrePostProcessorBehavior<,>));
+        //services.AddOpenBehavior(typeof(PrePostProcessorBehavior<,>));
 
         // Register user-supplied pipeline behaviors (if any)
-        if (pipelineBehaviors != null)
-        {
-            foreach (var behaviorType in pipelineBehaviors)
-            {
-                if (behaviorType != typeof(AdvancedLoggingBehavior<,>) &&
-                    behaviorType != typeof(TimeoutBehavior<,>) &&
-                    behaviorType != typeof(PrePostProcessorBehavior<,>))
-                    services.AddOpenBehavior(behaviorType);
-            }
-        }
+        //if (pipelineBehaviors != null)
+        //{
+        //    foreach (var behaviorType in pipelineBehaviors)
+        //    {
+        //        if (behaviorType != typeof(AdvancedLoggingBehavior<,>) &&
+        //            behaviorType != typeof(TimeoutBehavior<,>) &&
+        //            behaviorType != typeof(PrePostProcessorBehavior<,>))
+        //            services.AddOpenBehavior(behaviorType);
+        //    }
+        //}
 
         // Register validators
         services.AddValidatorsFromAssemblies(assemblies, includeInternalTypes: true);
 
         // Register mediator and interfaces
-        services.AddTransient<IMediator, Mediator>();
-        services.AddTransient<ISender>(sp => sp.GetRequiredService<IMediator>());
-        services.AddTransient<IPublisher>(sp => sp.GetRequiredService<IMediator>());
+        services.AddScoped<IMediator, Mediator>();
+        services.AddScoped<ISender>(sp => sp.GetRequiredService<IMediator>());
+        services.AddScoped<IPublisher>(sp => sp.GetRequiredService<IMediator>());
         return services;
     }
 
@@ -63,7 +63,8 @@ public static class ServiceCollectionExtensions
                         i.GetGenericTypeDefinition() == typeof(ICommandHandler<>) ||
                         i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
                         i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>)
+                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>) ||
+                        i.GetGenericTypeDefinition() == typeof(IRequestHandlerBase<,>)
                     )
                 )
             );
@@ -76,7 +77,8 @@ public static class ServiceCollectionExtensions
                         i.GetGenericTypeDefinition() == typeof(ICommandHandler<>) ||
                         i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
                         i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>)
+                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>) ||
+                        i.GetGenericTypeDefinition() == typeof(IRequestHandlerBase<,>)
                     )
                 ))
             {
