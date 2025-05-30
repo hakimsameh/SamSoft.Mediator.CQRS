@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SamSoft.Mediator.CQRS.Conso
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SamSoft.Mediator.CQRS.Tests", "SamSoft.Mediator.CQRS.Tests\SamSoft.Mediator.CQRS.Tests.csproj", "{5C6E22E8-7457-24D0-2F7E-A3E2D4EE6E2C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SamSoft.Mediator.CQRS.Benchmark", "SamSoft.Mediator.CQRS.Benchmark\SamSoft.Mediator.CQRS.Benchmark.csproj", "{FBD9CB0E-59A5-83F8-0D59-EA776CB90065}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{5C6E22E8-7457-24D0-2F7E-A3E2D4EE6E2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C6E22E8-7457-24D0-2F7E-A3E2D4EE6E2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C6E22E8-7457-24D0-2F7E-A3E2D4EE6E2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBD9CB0E-59A5-83F8-0D59-EA776CB90065}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBD9CB0E-59A5-83F8-0D59-EA776CB90065}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBD9CB0E-59A5-83F8-0D59-EA776CB90065}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBD9CB0E-59A5-83F8-0D59-EA776CB90065}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using SamSoft.Mediator.CQRS;
 using SamSoft.Mediator.CQRS.Abstractions;
+using SamSoft.Mediator.CQRS.Extensions;
 using SamSoft.Mediator.CQRS.Tests.TestObjects;
 using Xunit;
 
@@ -19,7 +19,7 @@ public record DefaultNotification(string Message) : INotification;
 
 public class StrategyTestNotificationHandlerA : INotificationHandler<SequentialNotification>, INotificationHandler<ParallelNotification>, INotificationHandler<DefaultNotification>
 {
-    public static List<string> Calls = new();
+    public static List<string> Calls = [];
     public Task Handle(SequentialNotification notification, CancellationToken cancellationToken = default)
     {
         Calls.Add("A:" + notification.Message);
@@ -60,7 +60,8 @@ public class NotificationPublishStrategyTests
     private static ServiceProvider BuildServices()
     {
         var services = new ServiceCollection();
-        services.AddMediatorCQRS(assemblies: [typeof(NotificationPublishStrategyTests).Assembly], addDefaultLogging: false);
+        //services.AddMediatorCQRS(assemblies: [typeof(NotificationPublishStrategyTests).Assembly], addDefaultLogging: false);
+        services.AddMediatorService(assemblies: [typeof(StrategyTestNotificationHandlerA).Assembly]);
         return services.BuildServiceProvider();
     }
 

@@ -1,169 +1,108 @@
 # SamSoft.Mediator.CQRS
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/hakimsameh/SamSoft.Mediator.CQRS)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/hakimsameh/SamSoft.Mediator.CQRS)
-[![NuGet](https://img.shields.io/nuget/v/SamSoft.Mediator.CQRS.svg?cacheSeconds=600)](https://www.nuget.org/packages/SamSoft.Mediator.CQRS)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-
-A modern, extensible, and high-performance .NET library for implementing the CQRS (Command Query Responsibility Segregation) and Mediator patterns. Supports commands, queries, notifications (publish/subscribe), pipeline behaviors, validation, and more.
+A professional, high-performance, and extensible .NET CQRS (Command Query Responsibility Segregation) mediator library inspired by MediatR, with modern DI integration, pipeline behaviors, and advanced configuration.
 
 ---
 
-## ✨ Features
+## 🚀 Features
 
-- **CQRS and Mediator patterns** for clean separation of concerns
-- **Command, Query, and Notification handlers** Supports `ICommand`, `ICommand<TResponse>`, `IQuery<TResponse>`, and `INotification` with their corresponding `ICommandHandler` and `IQueryHandler` interfaces, enabling diverse application logic.
-- **Pipeline behaviors** (logging, validation, etc.)
-- **FluentValidation integration**
-- **Publish/Subscribe notifications** (multiple handlers per event)
-- **Centralized, flexible DI registration**
-- **Interface segregation** (`ISender`, `IPublisher`, `IMediator`)
-- **Unit/integration testable**
-- **.NET 9+ ready**
-
----
-
-## 🚀 Installation
-
-1. **NuGet (coming soon):**
-   ```sh
-   dotnet add package SamSoft.Mediator.CQRS
-   ```
-2. **Or reference the project directly in your solution.**
+- **CQRS Abstractions**: Clean interfaces for commands, queries, and notifications.
+- **Handler Registration**: Automatic discovery and registration of handlers (internal or public) from assemblies.
+- **Pipeline Behaviors**: Pluggable, ordered pipeline for cross-cutting concerns (logging, validation, timeouts, etc.).
+- **Pre/Post Processors**: Support for request pre- and post-processing behaviors.
+- **Notification/Event Publishing**: Publish events to multiple handlers with custom strategies.
+- **Configurable Lifetime**: Choose Singleton, Scoped, or Transient for the mediator.
+- **Extensible Configuration**: Register behaviors, processors, and assemblies via a single options object.
+- **Optimized Performance**: Delegate pipeline caching for near-zero overhead dispatch (on par with MediatR).
+- **Full .NET DI Integration**: Works with Microsoft.Extensions.DependencyInjection.
 
 ---
 
 ## 🛠️ Quick Start
 
-### 1. Register in DI
-
 ```csharp
-services.AddMediatorCQRS(
-    pipelineBehaviors: new[] { typeof(ValidationBehavior<,>), typeof(LoggingPipelineBehavior<,>) },
-    assemblies: new[] { typeof(YourHandler).Assembly }
-);
+// In your Startup.cs or Program.cs
+services.AddMediatorService(options =>
+{
+    options.Lifetime = ServiceLifetime.Scoped; // or Singleton/Transient
+    options.RegisterServicesFromAssembly(typeof(MyHandler).Assembly);
+    options.BehaviorsToRegister.Add(ServiceDescriptor.Transient(typeof(IPipelineBehavior<,>), typeof(TimeoutBehavior<,>)));
+    options.BehaviorsToRegister.Add(ServiceDescriptor.Transient(typeof(IPipelineBehavior<,>), typeof(PrePostProcessorBehavior<,>)));
+    // Add pre/post processors as needed
+    options.TimeoutSettings.Timeout = TimeSpan.FromSeconds(10);
+});
 ```
 
-### 2. Define a Command and Handler
+---
+
+## ✨ Example Usage
 
 ```csharp
-public record CreateUserCommand(string Name) : ICommand<string>;
+// Define a command
+public class CreateUserCommand : ICommand<string> { /* ... */ }
 
-public class CreateUserHandler : ICommandHandler<CreateUserCommand, string>
+// Implement a handler
+internal class CreateUserHandler : ICommandHandler<CreateUserCommand, string>
 {
-    public Task<Result<string>> Handle(CreateUserCommand command, CancellationToken cancellationToken = default)
-        => Task.FromResult(Result.Success($"User {command.Name} created"));
-}
-```
-
-### 3. Define a Query and Handler
-
-```csharp
-public record GetUserQuery(string Name) : IQuery<string>;
-
-public class GetUserHandler : IQueryHandler<GetUserQuery, string>
-{
-    public Task<Result<string>> Handle(GetUserQuery query, CancellationToken cancellationToken = default)
-        => Task.FromResult(Result.Success($"User: {query.Name}"));
-}
-```
-
-### 4. Define a Notification and Handlers
-
-```csharp
-public record UserCreatedNotification(string Name) : INotification;
-
-public class SendWelcomeEmail : INotificationHandler<UserCreatedNotification>
-{
-    public Task Handle(UserCreatedNotification notification, CancellationToken cancellationToken = default)
+    public Task<Result<string>> Handle(CreateUserCommand command, CancellationToken cancellationToken)
     {
-        // Send email logic
-        return Task.CompletedTask;
+        // ...
     }
 }
 
-public class LogUserCreation : INotificationHandler<UserCreatedNotification>
+// Send a command
+var result = await mediator.Send(new CreateUserCommand(...));
+
+// Define and handle a notification
+public class UserCreatedNotification : INotification { /* ... */ }
+internal class UserCreatedHandler : INotificationHandler<UserCreatedNotification>
 {
-    public Task Handle(UserCreatedNotification notification, CancellationToken cancellationToken = default)
-    {
-        // Log logic
-        return Task.CompletedTask;
-    }
+    public Task Handle(UserCreatedNotification notification, CancellationToken cancellationToken) { /* ... */ }
 }
-```
-
-### 5. Using the Mediator
-
-```csharp
-var sender = serviceProvider.GetRequiredService<ISender>();
-var result = await sender.Send(new CreateUserCommand("Alice"));
-
-var publisher = serviceProvider.GetRequiredService<IPublisher>();
-await publisher.Publish(new UserCreatedNotification("Alice"));
+await mediator.Publish(new UserCreatedNotification(...));
 ```
 
 ---
 
-## 🧩 Pipeline Behaviors
+## ⚡ Benchmarks
 
-Pipeline behaviors allow you to add cross-cutting concerns (logging, validation, etc.)
+| Method                | Mean (ns) | Error (ns) | StdDev (ns) |
+|---------------------- |----------:|-----------:|------------:|
+| SamSoft_Send_Command  |   303.8   |    9.81    |    28.31    |
+| MediateR_Send_Command |   286.3   |   11.50    |    33.53    |
 
-```csharp
-public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-{
-    public async Task<TResponse> Handle(TRequest request, HandlerDelegate<TResponse> next, CancellationToken cancellationToken)
-    {
-        // Before
-        var response = await next(cancellationToken);
-        // After
-        return response;
-    }
-}
-```
-Register with:
-```csharp
-services.AddMediatorCQRS(pipelineBehaviors: new[] { typeof(LoggingBehavior<,>) }, assemblies: ...);
-```
+- **Performance is on par with MediatR** for command dispatch.
+- Pipeline behaviors add minimal overhead (as expected for any mediator).
+- Optimized for real-world, production-grade scenarios.
 
 ---
 
-## ✅ Validation
+## 🧩 Extensibility
 
-Integrates with [FluentValidation](https://fluentvalidation.net/):
-
-```csharp
-public class CreateUserValidator : AbstractValidator<CreateUserCommand>
-{
-    public CreateUserValidator()
-    {
-        RuleFor(x => x.Name).NotEmpty();
-    }
-}
-```
-Validators are discovered automatically from the provided assemblies.
+- Add custom pipeline behaviors, pre/post processors, and notification publishers.
+- Register handlers and behaviors from any assembly.
+- Configure all options via `MediatorOptions`.
 
 ---
 
-## 🧪 Testing
+## 📦 Why Choose SamSoft.Mediator.CQRS?
 
-Run tests with:
-```sh
-dotnet test
-```
-See the `SamSoft.Mediator.CQRS.Tests` project for examples.
+- Professional, modern CQRS mediator for .NET
+- MediatR-like API and performance, but fully customizable
+- Designed for enterprise, modular, and high-performance applications
 
 ---
 
-## 📦 Contributing
+## 📚 Documentation
 
-Contributions are welcome! Please open issues or submit pull requests.
+- See XML docs and code comments for API details.
+- For advanced scenarios, see the `MediatorOptions` class and extension methods.
 
 ---
 
-## 📄 License
+## 🏆 License
 
-[MIT](LICENSE)
+MIT
 
 ---
 
@@ -175,4 +114,111 @@ For questions or support, contact [hakimsameh70@gmail.com](mailto:hakimsameh70@g
 
 **Tip:**  
 - For API documentation, see XML comments in the source or generate docs with DocFX.
-- For advanced usage, see the `SamSoft.Mediator.CQRS.Tests` project. 
+- For advanced usage, see the `SamSoft.Mediator.CQRS.Tests` project.
+
+## Getting Started
+
+1. **Install the NuGet package:**
+   ```sh
+   dotnet add package SamSoft.Mediator.CQRS
+   ```
+
+2. **Register the Mediator in your DI container:**
+   ```csharp
+   services.AddMediatorCQRS();
+   ```
+
+## Defining Requests and Handlers
+
+### Command
+```csharp
+public class MyCommand(string value) : ICommand<string>
+{
+    public string Value { get; } = value;
+}
+
+public class MyCommandHandler : ICommandHandler<MyCommand, string>
+{
+    public Task<Result<string>> Handle(MyCommand command, CancellationToken cancellationToken = default)
+        => Task.FromResult(Result.Success(command.Value + "_handled"));
+}
+```
+
+### Query
+```csharp
+public class MyQuery(int id) : IQuery<string>
+{
+    public int Id { get; } = id;
+}
+
+public class MyQueryHandler : IQueryHandler<MyQuery, string>
+{
+    public Task<Result<string>> Handle(MyQuery query, CancellationToken cancellationToken = default)
+        => Task.FromResult(Result.Success($"Value for {query.Id}"));
+}
+```
+
+### Notification
+```csharp
+public class MyNotification(string message) : INotification
+{
+    public string Message { get; } = message;
+}
+
+public class MyNotificationHandler : INotificationHandler<MyNotification>
+{
+    public Task Handle(MyNotification notification, CancellationToken cancellationToken = default)
+    {
+        Console.WriteLine($"Received: {notification.Message}");
+        return Task.CompletedTask;
+    }
+}
+```
+
+## Using the Mediator
+```csharp
+var result = await mediator.Send(new MyCommand("foo"));
+var queryResult = await mediator.Send(new MyQuery(1));
+await mediator.Publish(new MyNotification("Hello!"));
+```
+
+## Pipeline Behaviors (Decorators)
+You can add cross-cutting concerns (logging, validation, etc.) via pipeline behaviors:
+
+```csharp
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+{
+    public async Task<TResponse> Handle(TRequest request, HandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        Console.WriteLine($"Handling {typeof(TRequest).Name}");
+        var response = await next(cancellationToken);
+        Console.WriteLine($"Handled {typeof(TRequest).Name}");
+        return response;
+    }
+}
+```
+Register with:
+```csharp
+services.AddPipelineBehavior<LoggingBehavior<,>>();
+```
+
+## Exception Handling and Logging
+- Exceptions in handlers and pipeline behaviors are logged via `IMediatorLogger`.
+- You can provide your own logger by implementing `IMediatorLogger` and registering it in DI.
+
+## Validation
+- Add validators by implementing `FluentValidation.IValidator<TRequest>`.
+- Validators are automatically picked up if registered before `AddMediatorCQRS`.
+- Validation failures throw a `CustomValidationException` (see pipeline behavior).
+
+## Testing
+- Handlers and pipeline behaviors can be tested in isolation or via integration tests.
+- Use a test logger to assert logging behavior.
+
+## Advanced
+- Supports notification publish strategies (parallel/sequential).
+- Reflection caching for performance.
+- Thread-safe and production-ready with extensibility in mind.
+
+---
+For more details, see the source code and XML documentation comments. 

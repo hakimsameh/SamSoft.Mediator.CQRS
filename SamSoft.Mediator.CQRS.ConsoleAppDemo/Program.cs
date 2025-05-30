@@ -1,26 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using SamSoft.Mediator.CQRS;
-using SamSoft.Mediator.CQRS.DefaultBehaviors;
+using SamSoft.Mediator.CQRS.Abstractions;
+using SamSoft.Mediator.CQRS.ConsoleAppDemo;
 using SamSoft.Mediator.CQRS.ConsoleAppDemo.Command;
 
 Console.WriteLine("Hello, World!");
-//var host = Host.CreateDefaultBuilder(args)
-//                .ConfigureServices((context, services) =>
-//                {
-//                    services.AddMediatorService(addPipelineBehavior: true, typeof(MyRequestHandlerExtensions).Assembly);
-//                })
-//                .ConfigureLogging(logging =>
-//                {
-//                    logging.ClearProviders();
-//                    logging.AddConsole();
-//                })
-//                .Build();
-//await host.RunAsync();
-
-
-
 var services = MyRequestHandlerExtensions.CreateServices();
 
 var sender = services.GetService<ISender>();
@@ -50,29 +33,4 @@ if (checkNameResult.IsSuccess)
 else
 {
     Console.WriteLine($"Check name failed: {checkNameResult.Error.Message}");
-}
-
-public static class MyRequestHandlerExtensions
-{
-    public static ServiceProvider CreateServices()
-    {
-        var pipelineBehaviors = new[]
-        {
-            typeof(AdvancedLoggingBehavior<,>),
-            typeof(ValidationBehavior<,>),
-            typeof(LoggingPipelineBehavior<,>)
-            
-        };
-        var assemblies = new[] { typeof(MyRequestHandlerExtensions).Assembly };
-        var serviceProvider = new ServiceCollection()
-            .AddLogging(configure =>
-            {
-                configure.AddConsole(); // Add Console Logging
-                configure.AddDebug();  // Add Debug Logging (optional)
-            })
-
-            .AddMediatorCQRS(pipelineBehaviors, assemblies)
-            .BuildServiceProvider();
-        return serviceProvider;
-    }
 }

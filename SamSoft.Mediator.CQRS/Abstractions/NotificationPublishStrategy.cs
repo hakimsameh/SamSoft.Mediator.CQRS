@@ -21,11 +21,7 @@ public enum NotificationPublishStrategy
 /// Attribute to specify the notification publishing strategy for a notification type.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-public sealed class NotificationPublishStrategyAttribute : Attribute
+public sealed class NotificationPublishStrategyAttribute(NotificationPublishStrategy strategy) : Attribute
 {
-    public NotificationPublishStrategy Strategy { get; }
-    public NotificationPublishStrategyAttribute(NotificationPublishStrategy strategy)
-    {
-        Strategy = strategy;
-    }
+    public NotificationPublishStrategy Strategy { get; } = strategy;
 }

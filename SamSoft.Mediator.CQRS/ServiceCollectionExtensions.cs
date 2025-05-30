@@ -1,122 +1,134 @@
+using SamSoft.Mediator.CQRS.Abstractions.Requests;
+using SamSoft.Mediator.CQRS.Pipelines;
+
 namespace SamSoft.Mediator.CQRS;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddMediatorCQRS(
+    public static IServiceCollection AddMediatorService(
         this IServiceCollection services,
-        IEnumerable<Type>? pipelineBehaviors = null,
-        Assembly[]? assemblies = null,
-        bool addDefaultLogging = true)
+        Action<MediatorOptions>? configure = null)
     {
-        assemblies ??= new[] { Assembly.GetCallingAssembly() };
+        var options = new MediatorOptions();
+        configure?.Invoke(options);
 
-        // Register handlers
-        RegisterHandlers(services, assemblies);
+        var assemblies = options.AssembliesToRegister.Count > 0
+            ? options.AssembliesToRegister
+            : [Assembly.GetCallingAssembly()];
 
-        // Register TimeoutSettings for IOptions
-        services.Configure<DefaultBehaviors.TimeoutSettings>(options => { });
-
-        // Always add logging behavior first (outermost), unless disabled
-        if (addDefaultLogging)
-            services.AddOpenBehavior(typeof(DefaultBehaviors.AdvancedLoggingBehavior<,>));
-
-        // Always add timeout behavior (after logging, before user behaviors)
-        services.AddOpenBehavior(typeof(DefaultBehaviors.TimeoutBehavior<,>));
-
-        // Always add pre/post processor behavior (after timeout, before user behaviors)
-        services.AddOpenBehavior(typeof(DefaultBehaviors.PrePostProcessorBehavior<,>));
-
-        // Register user-supplied pipeline behaviors (if any)
-        if (pipelineBehaviors != null)
+        // Handler registration
+        var handlerInterfaces = new[]
         {
-            foreach (var behaviorType in pipelineBehaviors)
+            typeof(ICommandHandler<>),
+            typeof(ICommandHandler<,>),
+            typeof(IQueryHandler<,>),
+            typeof(INotificationHandler<>),
+            typeof(IRequestHandlerBase<,>)
+        };
+
+        var types = assemblies.SelectMany(a => a.GetTypes())
+            .Where(t => !t.IsAbstract && !t.IsInterface);
+
+        foreach (var type in types)
+        {
+            foreach (var handlerInterface in type.GetInterfaces()
+                .Where(i => i.IsGenericType && handlerInterfaces.Contains(i.GetGenericTypeDefinition())))
             {
-                if (behaviorType != typeof(DefaultBehaviors.AdvancedLoggingBehavior<,>) &&
-                    behaviorType != typeof(DefaultBehaviors.TimeoutBehavior<,>) &&
-                    behaviorType != typeof(DefaultBehaviors.PrePostProcessorBehavior<,>))
-                    services.AddOpenBehavior(behaviorType);
+                services.AddTransient(handlerInterface, type);
             }
         }
 
-        // Register validators
-        services.AddValidatorsFromAssemblies(assemblies, includeInternalTypes: true);
+        // Register pipeline behaviors
+        foreach (var behavior in options.BehaviorsToRegister)
+        {
+            services.TryAddEnumerable(behavior);
+        }
 
-        // Register mediator and interfaces
-        services.AddTransient<IMediator, Mediator>();
+        // Register pre-processors
+        foreach (var pre in options.RequestPreProcessorsToRegister)
+        {
+            services.TryAddEnumerable(pre);
+        }
+
+        // Register post-processors
+        foreach (var post in options.RequestPostProcessorsToRegister)
+        {
+            services.TryAddEnumerable(post);
+        }
+
+        // Register timeout settings
+        services.Configure<TimeoutSettings>(s =>
+        {
+            s.Timeout = options.TimeoutSettings.Timeout;
+            // Copy other properties as needed
+        });
+
+        // Register the mediator itself
+        services.Add(new ServiceDescriptor(typeof(IMediator), typeof(Mediator), ServiceLifetime.Scoped));
         services.AddTransient<ISender>(sp => sp.GetRequiredService<IMediator>());
         services.AddTransient<IPublisher>(sp => sp.GetRequiredService<IMediator>());
         return services;
     }
 
-    private static void RegisterHandlers(IServiceCollection services, Assembly[] assemblies)
-    {
-        var handlerTypes = assemblies
-            .SelectMany(a => a.GetTypes())
-            .Where(t => !t.IsAbstract && !t.IsInterface)
-            .Where(t =>
-                t.GetInterfaces().Any(i =>
-                    i.IsGenericType &&
-                    (
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<>) ||
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>)
-                    )
-                )
-            );
 
-        foreach (var handlerType in handlerTypes)
+    public static IServiceCollection AddMediatorService(
+        this IServiceCollection services,
+        params Assembly[] assemblies)
+    {
+        if (assemblies == null || assemblies.Length == 0)
+            assemblies = [Assembly.GetCallingAssembly()];
+        services.Configure<TimeoutSettings>(options => { });
+        // Handler registration
+        var handlerInterfaces = new[]
         {
-            foreach (var handlerInterface in handlerType.GetInterfaces()
-                .Where(i => i.IsGenericType &&
-                    (
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<>) ||
-                        i.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(IQueryHandler<,>) ||
-                        i.GetGenericTypeDefinition() == typeof(INotificationHandler<>)
-                    )
-                ))
+            typeof(ICommandHandler<>),
+            typeof(ICommandHandler<,>),
+            typeof(IQueryHandler<,>),
+            typeof(IRequestHandlerBase<,>),
+            typeof(INotificationHandler<>)
+        };
+
+        var types = assemblies.SelectMany(a => a.GetTypes())
+            .Where(t => !t.IsAbstract && !t.IsInterface);
+
+        foreach (var type in types)
+        {
+            foreach (var handlerInterface in type.GetInterfaces()
+                .Where(i => i.IsGenericType && handlerInterfaces.Contains(i.GetGenericTypeDefinition())))
             {
-                services.AddTransient(handlerInterface, handlerType);
+                services.AddTransient(handlerInterface, type);
             }
         }
-    }
+        // Always add timeout behavior (after logging, before user behaviors)
 
-    /// <summary>
-    /// Registers an open generic pipeline behavior using TryAddEnumerable, allowing multiple behaviors.
-    /// </summary>
-    public static IServiceCollection AddOpenBehavior(this IServiceCollection services, Type openBehaviorType, ServiceLifetime serviceLifetime = ServiceLifetime.Transient)
-    {
-        if (!openBehaviorType.IsGenericTypeDefinition)
-        {
-            throw new InvalidOperationException($"{openBehaviorType.Name} must be an open generic type definition");
-        }
+        /// Add Optional Pipeline Behaviors
+        /// 
+        services.AddPipelineBehaviors([typeof(TimeoutBehavior<,>),
+            typeof(PrePostProcessorBehavior<,>)]);
 
-        var implementedGenericInterfaces = openBehaviorType.GetInterfaces()
-            .Where(i => i.IsGenericType)
-            .Select(i => i.GetGenericTypeDefinition());
+        // Always add pre/post processor behavior (after timeout, before user behaviors)
 
-        var implementedOpenBehaviorInterfaces = new HashSet<Type>(implementedGenericInterfaces
-            .Where(i => i == typeof(IPipelineBehavior<,>)));
 
-        if (implementedOpenBehaviorInterfaces.Count == 0)
-        {
-            throw new InvalidOperationException($"{openBehaviorType.Name} must implement {typeof(IPipelineBehavior<,>).FullName}");
-        }
-
-        foreach (var openBehaviorInterface in implementedOpenBehaviorInterfaces)
-        {
-            services.TryAddEnumerable(new ServiceDescriptor(openBehaviorInterface, openBehaviorType, serviceLifetime));
-        }
+        // Register the mediator itself
+        services.AddSingleton<IMediator, Mediator>();
+        services.AddTransient<ISender>(sp => sp.GetRequiredService<IMediator>());
+        services.AddTransient<IPublisher>(sp => sp.GetRequiredService<IMediator>());
         return services;
     }
 
-    /// <summary>
-    /// Registers an open generic pipeline behavior of type TBehavior.
-    /// </summary>
-    public static IServiceCollection AddPipelineBehavior<TBehavior>(this IServiceCollection services, ServiceLifetime serviceLifetime = ServiceLifetime.Transient)
+    // Helper for open generic pipeline behaviors
+    public static IServiceCollection AddPipelineBehavior<TBehavior>(this IServiceCollection services)
         where TBehavior : class
     {
-        return services.AddOpenBehavior(typeof(TBehavior), serviceLifetime);
+        services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IPipelineBehavior<,>), typeof(TBehavior)));
+        return services;
+    }
+    public static IServiceCollection AddPipelineBehaviors(this IServiceCollection services, params Type[] pipelineBehaviors)
+    {
+        foreach (var behavior in pipelineBehaviors)
+        {
+            services.TryAddEnumerable(ServiceDescriptor.Transient(typeof(IPipelineBehavior<,>), behavior));
+        }
+        return services;
     }
 }

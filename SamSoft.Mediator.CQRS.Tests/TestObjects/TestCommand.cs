@@ -4,7 +4,10 @@ using SamSoft.Mediator.CQRS.Abstractions;
 namespace SamSoft.Mediator.CQRS.Tests.TestObjects;
 
 // Sample command, query, notification, and handlers for testing
-public record TestCommand(string Value) : ICommand<string>;
+public class TestCommand(string value) : ICommand<string>
+{
+    public string Value { get; } = value;
+}
 
 public class TestCommandHandler : ICommandHandler<TestCommand, string>
 {

@@ -1,12 +1,10 @@
+using SamSoft.Mediator.CQRS.Abstractions.Requests;
+
 namespace SamSoft.Mediator.CQRS.Abstractions;
+public interface ICommand : IResponseRequest<Result>, IBaseCommand;
 
-// Marker interface for all commands and queries
-public interface IBaseCommand { }
+public interface ICommand<TResponse> : IResponseRequest<Result<TResponse>>, IBaseCommand;
 
-// Command without return value
-public interface ICommand : IBaseCommand { }
-
-// Command with return value
-public interface ICommand<TResponse> : IBaseCommand { }
+public interface IBaseCommand;
 
 

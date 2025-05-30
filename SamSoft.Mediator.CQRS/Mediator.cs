@@ -1,58 +1,55 @@
-namespace SamSoft.Mediator.CQRS;
+using SamSoft.Mediator.CQRS.Abstractions.Requests;
+using SamSoft.Mediator.CQRS.Handlers;
+using SamSoft.Mediator.CQRS.Handlers.Notifications;
+using SamSoft.Mediator.CQRS.Logging;
 using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using SamSoft.Mediator.CQRS.Abstractions;
-using System.Reflection;
+
+namespace SamSoft.Mediator.CQRS;
+
 
 /// <summary>
 /// Default implementation of the <see cref="IMediator"/> interface for CQRS and Mediator patterns.
 /// </summary>
-public class Mediator(IServiceProvider serviceProvider) : IMediator
+public class Mediator : IMediator
 {
-    private Task<TResponse> ExecutePipeline<TRequest, TResponse>(
-        TRequest request,
-        Func<Task<TResponse>> handlerInvoker,
-        CancellationToken cancellationToken)
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IMediatorLogger _logger;
+    private readonly INotificationPublisher _publisher;
+
+    private static readonly ConcurrentDictionary<Type, RequestHandlerBase> RequestHandlers = new();
+    private static readonly ConcurrentDictionary<Type, NotificationHandlerWrapper> NotificationHandlers = new();
+    public Mediator(IServiceProvider serviceProvider, IMediatorLogger? logger = null)
+        : this(serviceProvider, new ForeachAwaitPublisher(), logger) { }
+    private Mediator(IServiceProvider serviceProvider, INotificationPublisher publisher
+        , IMediatorLogger? logger = null)
     {
-        if (request == null)
-            throw new ArgumentNullException(nameof(request), "Request cannot be null");
-        var pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(typeof(TRequest), typeof(TResponse));
-        var behaviors = serviceProvider.GetServices(pipelineType)
-            .Cast<object>()
-            .Reverse()
-            .ToList();
-
-        HandlerDelegate<TResponse> next = (CancellationToken t = default) => handlerInvoker();
-
-        foreach (var behavior in behaviors)
-        {
-            var current = next;
-            next = (CancellationToken t = default) =>
-            {
-                var method = pipelineType.GetMethod(MediatorDefaults.HandlerMethodName);
-                if (method == null)
-                    throw new InvalidOperationException($"Handle method not found for {pipelineType.Name}");
-                return (Task<TResponse>)method.Invoke(behavior, [request, current, cancellationToken])!;
-            };
-        }
-
-        return next(cancellationToken);
+        _serviceProvider = serviceProvider;
+        _logger = logger ?? new ConsoleMediatorLogger();
+        _publisher = publisher;
     }
 
+    private Task<TResponse> SendImplementation<TResponse>(IResponseRequest<TResponse> request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var handler = (RequestHandlerWrapper<TResponse>)RequestHandlers.GetOrAdd(request.GetType(), static requestType =>
+        {
+            var wrapperType = typeof(RequestHandlerWrapperImplementation<,>)
+                .MakeGenericType(requestType, typeof(TResponse));
+            var wrapper = Activator.CreateInstance(wrapperType) ?? throw new InvalidOperationException($"Could not create wrapper type for {requestType}");
+            return (RequestHandlerBase)wrapper;
+        });
+
+        return handler.Handle(request, _serviceProvider, cancellationToken);
+    }
+   
     /// <summary>
     /// Sends a command that does not return a value.
     /// </summary>
     /// <inheritdoc/>
     public Task<Result> Send(ICommand command, CancellationToken cancellationToken = default)
     {
-        var handlerType = typeof(ICommandHandler<>).MakeGenericType(command.GetType());
-        var handler = serviceProvider.GetService(handlerType)
-            ?? throw new InvalidOperationException($"Handler not found for {command.GetType().Name}");
-        var method = handlerType.GetMethod(MediatorDefaults.HandlerMethodName);
-        if (method == null)
-            throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
-        async Task<Result> handlerInvoker() => await (Task<Result>)method.Invoke(handler, [command, cancellationToken])!;
-        return ExecutePipeline(command, handlerInvoker, cancellationToken);
+        return SendImplementation(command, cancellationToken);
     }
 
     /// <summary>
@@ -61,14 +58,7 @@ public class Mediator(IServiceProvider serviceProvider) : IMediator
     /// <inheritdoc/>
     public Task<Result<TResponse>> Send<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
     {
-        var handlerType = typeof(ICommandHandler<,>).MakeGenericType(command.GetType(), typeof(TResponse));
-        var handler = serviceProvider.GetService(handlerType)
-            ?? throw new InvalidOperationException($"Handler not found for {command.GetType().Name}");
-        var method = handlerType.GetMethod(MediatorDefaults.HandlerMethodName);
-        if (method == null)
-            throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
-        async Task<Result<TResponse>> handlerInvoker() => await (Task<Result<TResponse>>)method.Invoke(handler, [command, cancellationToken])!;
-        return ExecutePipeline(command, handlerInvoker, cancellationToken);
+        return SendImplementation(command, cancellationToken);
     }
 
     /// <summary>
@@ -77,54 +67,39 @@ public class Mediator(IServiceProvider serviceProvider) : IMediator
     /// <inheritdoc/>
     public Task<Result<TResponse>> Send<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
     {
-        var handlerType = typeof(IQueryHandler<,>).MakeGenericType(query.GetType(), typeof(TResponse));
-        var handler = serviceProvider.GetService(handlerType)
-            ?? throw new InvalidOperationException($"Handler not found for {query.GetType().Name}");
-        var method = handlerType.GetMethod(MediatorDefaults.HandlerMethodName);
-        if (method == null)
-            throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
+        return SendImplementation(query, cancellationToken);
+    }
+    
+    public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+        where TNotification : INotification
+    {
+        if (notification == null)
+        {
+            throw new ArgumentNullException(nameof(notification));
+        }
 
-        async Task<Result<TResponse>> handlerInvoker() => await (Task<Result<TResponse>>)method.Invoke(handler, [query, cancellationToken])!;
-        return ExecutePipeline(query, handlerInvoker, cancellationToken);
+        return PublishNotification(notification, cancellationToken);
     }
 
     /// <summary>
-    /// Publishes a notification to all registered handlers.
+    /// Override in a derived class to control how the tasks are awaited. By default the implementation calls the <see cref="INotificationPublisher"/>.
     /// </summary>
-    /// <inheritdoc/>
-    public async Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-        where TNotification : INotification
+    /// <param name="handlerExecutors">Enumerable of tasks representing invoking each notification handler</param>
+    /// <param name="notification">The notification being published</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task representing invoking all handlers</returns>
+    private Task PublishCore(IEnumerable<NotificationHandlerExecutor> handlerExecutors, INotification notification, CancellationToken cancellationToken)
+        => _publisher.Publish(handlerExecutors, notification, cancellationToken);
+
+    private Task PublishNotification(INotification notification, CancellationToken cancellationToken = default)
     {
-        var handlerType = typeof(INotificationHandler<>).MakeGenericType(typeof(TNotification));
-        var handlers = serviceProvider.GetServices(handlerType).ToList();
-
-        // Default strategy
-        var strategy = NotificationPublishStrategy.Parallel;
-        var attr = typeof(TNotification).GetCustomAttribute<NotificationPublishStrategyAttribute>();
-        if (attr != null)
-            strategy = attr.Strategy;
-
-        if (strategy == NotificationPublishStrategy.Sequential)
+        var handler = NotificationHandlers.GetOrAdd(notification.GetType(), static notificationType =>
         {
-            foreach (var handler in handlers)
-            {
-                var method = handlerType.GetMethod("Handle");
-                if (method == null)
-                    throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
-                await (Task)method.Invoke(handler, new object[] { notification!, cancellationToken })!;
-            }
-        }
-        else // Parallel (default)
-        {
-            var tasks = new List<Task>();
-            foreach (var handler in handlers)
-            {
-                var method = handlerType.GetMethod("Handle");
-                if (method == null)
-                    throw new InvalidOperationException($"Handle method not found for {handlerType.Name}");
-                tasks.Add((Task)method.Invoke(handler, new object[] { notification!, cancellationToken })!);
-            }
-            await Task.WhenAll(tasks);
-        }
+            var wrapperType = typeof(NotificationHandlerWrapperImplementation<>).MakeGenericType(notificationType);
+            var wrapper = Activator.CreateInstance(wrapperType) ?? throw new InvalidOperationException($"Could not create wrapper for type {notificationType}");
+            return (NotificationHandlerWrapper)wrapper;
+        });
+
+        return handler.Handle(notification, _serviceProvider, PublishCore, cancellationToken);
     }
 }

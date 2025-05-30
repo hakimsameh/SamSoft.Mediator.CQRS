@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using SamSoft.Common.Results;
 using SamSoft.Mediator.CQRS.Abstractions;
+using SamSoft.Mediator.CQRS.Extensions;
 using SamSoft.Mediator.CQRS.Tests.TestObjects;
 
 namespace SamSoft.Mediator.CQRS.Tests;
@@ -19,7 +20,8 @@ public class PrePostProcessorTests
         var services = new ServiceCollection();
         services.AddTransient(typeof(IRequestPreProcessor<>), typeof(TestPreProcessor<>));
         services.AddTransient(typeof(IRequestPostProcessor<,>), typeof(TestPostProcessor<,>));
-        services.AddMediatorCQRS(assemblies: [typeof(PrePostTestHandler).Assembly], addDefaultLogging: false);
+        //services.AddMediatorCQRS(assemblies: [typeof(PrePostTestHandler).Assembly], addDefaultLogging: false);
+        services.AddMediatorService(assemblies: [typeof(PrePostTestHandler).Assembly]);
         return services.BuildServiceProvider();
     }
 

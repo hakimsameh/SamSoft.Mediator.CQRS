@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using SamSoft.Mediator.CQRS.Abstractions;
 using SamSoft.Mediator.CQRS.Tests.TestObjects;
 
 namespace SamSoft.Mediator.CQRS.Tests;
@@ -48,6 +49,43 @@ public class MediatorTests : MediatorTestsBase
         Assert.Contains("A:notify", TestNotificationHandlerA.Received);
         Assert.Contains("B:notify", TestNotificationHandlerB.Received);
     }
+
+    //[Fact]
+    //public async Task Mediator_LogsError_WhenHandlerThrowsException()
+    //{
+    //    var services = new ServiceCollection();
+    //    var testLogger = new TestMediatorLogger();
+    //    services.AddSingleton<IMediatorLogger>(testLogger);
+    //    services.AddMediatorService();
+    //    services.AddTransient<ICommandHandler<ThrowingTestCommand>, ThrowingTestCommandHandler>();
+    //    var provider = services.BuildServiceProvider();
+    //    var mediator = provider.GetRequiredService<IMediator>();
+
+    //    var ex = await Assert.ThrowsAsync<TargetInvocationException>(async () =>
+    //    {
+    //        await mediator.Send(new ThrowingTestCommand());
+    //    });
+    //    Assert.IsType<InvalidOperationException>(ex.InnerException);
+    //}
+
+    //[Fact]
+    //public async Task ValidationBehavior_ThrowsCustomValidationException_OnFailure()
+    //{
+    //    var services = new ServiceCollection();
+    //    services.AddTransient(typeof(FluentValidation.IValidator<TestCommand>), sp => new AlwaysFailingTestCommandValidator());
+    //    services.AddMediatorCQRS(addDefaultLogging: false);
+    //    var provider = services.BuildServiceProvider();
+    //    var mediator = provider.GetRequiredService<IMediator>();
+
+    //    var ex = await Assert.ThrowsAsync<System.Reflection.TargetInvocationException>(async () =>
+    //    {
+    //        await mediator.Send(new TestCommand("fail"));
+    //    });
+    //    Assert.IsType<SamSoft.Mediator.CQRS.DefaultBehaviors.CustomValidationException>(ex.InnerException);
+    //    var validationEx = (SamSoft.Mediator.CQRS.DefaultBehaviors.CustomValidationException)ex.InnerException!;
+    //    Assert.NotEmpty(validationEx.Errors);
+    //    //Assert.Contains(validationEx.Errors, e => e.ErrorMessage == "Always fails");
+    //}
 
     // You can add more tests for validation/error scenarios as needed
 }
