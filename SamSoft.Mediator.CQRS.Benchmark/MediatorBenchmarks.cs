@@ -9,7 +9,7 @@ using SamSoft.Mediator.CQRS.Extensions;
 namespace SamSoft.Mediator.CQRS.Benchmark;
 
 
-
+[MemoryDiagnoser(true)]
 public class MediatorBenchmarks
 {
     private Abstractions.IMediator? _samSoftMediator;

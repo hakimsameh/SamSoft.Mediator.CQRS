@@ -66,10 +66,11 @@ await mediator.Publish(new UserCreatedNotification(...));
 
 ## ⚡ Benchmarks
 
-| Method                | Mean (ns) | Error (ns) | StdDev (ns) |
-|---------------------- |----------:|-----------:|------------:|
-| SamSoft_Send_Command  |   303.8   |    9.81    |    28.31    |
-| MediateR_Send_Command |   286.3   |   11.50    |    33.53    |
+| Method                | Mean     | Error    | StdDev   | Gen0   | Allocated |
+|---------------------- |---------:|---------:|---------:|-------:|----------:|
+| SamSoft_Send_Command  | 389.7 ns | 28.04 ns | 82.66 ns | 0.0896 |     376 B |
+| MediateR_Send_Command | 423.8 ns | 31.48 ns | 92.83 ns | 0.0801 |     336 B |
+
 
 - **Performance is on par with MediatR** for command dispatch.
 - Pipeline behaviors add minimal overhead (as expected for any mediator).
