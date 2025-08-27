@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
         var assemblies = options.AssembliesToRegister.Count > 0
             ? options.AssembliesToRegister
             : [Assembly.GetCallingAssembly()];
-
+        services.AddValidatorsFromAssemblies(assemblies, includeInternalTypes: true);
         // Handler registration
         var handlerInterfaces = new[]
         {
@@ -78,6 +78,7 @@ public static class ServiceCollectionExtensions
         if (assemblies == null || assemblies.Length == 0)
             assemblies = [Assembly.GetCallingAssembly()];
         services.Configure<TimeoutSettings>(options => { });
+        services.AddValidatorsFromAssemblies(assemblies, includeInternalTypes: true);
         // Handler registration
         var handlerInterfaces = new[]
         {
